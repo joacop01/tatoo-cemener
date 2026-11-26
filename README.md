@@ -91,14 +91,12 @@ El resultado queda en `dist\TatooCEMENER\`. Hay que distribuir la carpeta comple
 
 ### Publicar una versión nueva
 
-El repositorio compila el ejecutable solo, en GitHub, cada vez que se publica una etiqueta de versión:
+El ejecutable se compila solo en GitHub cada vez que se sube un cambio de la app a `main`:
 
-```
-git tag v2.1
-git push origin v2.1
-```
+1. Cambiá `APP_VERSION` en `tatuajes.py` (por ejemplo, de `"2.1"` a `"2.2"`).
+2. Subí el cambio.
 
-A los pocos minutos aparece en **Releases** el `.zip` listo para descargar. También se puede lanzar a mano desde la pestaña **Actions → Compilar ejecutable → Run workflow**.
+A los pocos minutos aparece en **Releases** la versión nueva con el `.zip` listo para descargar. Si no cambiás `APP_VERSION`, se reemplaza el `.zip` de la versión actual. También se puede lanzar a mano desde **Actions → Compilar ejecutable → Run workflow**.
 
 ---
 
