@@ -4,6 +4,10 @@ Aplicación de escritorio para marcar los puntos de tatuaje de referencia sobre 
 
 Desarrollada para el servicio de radioterapia de CEMENER (Fundación Centro de Medicina Nuclear y Molecular de Entre Ríos).
 
+![Ventana principal con un estudio cargado y marcas de tatuaje](docs/capturas/principal.png)
+
+<sub>Las capturas usan pacientes e imágenes ficticios generados para la demostración.</sub>
+
 ---
 
 ## Descargar y usar
@@ -24,13 +28,21 @@ La primera vez, Windows puede mostrar el aviso "Windows protegió su PC" porque 
 
 ## Cómo se usa
 
+<img src="docs/capturas/busqueda.png" alt="Búsqueda de pacientes" width="300" align="right">
+
 1. **Paciente:** `Ctrl+F` y escribí el apellido o el DNI. La lista muestra el nombre del paciente y su DNI, ordenada por última modificación (los más recientes primero).
 2. **Imagen:** se abre sola la reconstrucción 3D (archivos que empiezan con `SC`). Si el paciente no tiene, se muestran todas sus imágenes.
 3. **Recortar** (opcional): `R` y arrastrá sobre la zona de interés. "Ver completa" vuelve a la imagen entera.
 4. **Colocar tatuajes:** elegí el color en la sección *Tatuajes*, apretá `T` y hacé clic en cada punto. `Ctrl+Z` deshace la última marca.
 5. **Exportar:** `Ctrl+E` o el botón *Exportar imagen…*, y elegí la carpeta. Se guarda como `Tatuaje.jpg` (el formato se cambia en *Formato de salida*).
 
-Si intentás cambiar de paciente, de imagen o cerrar el programa con marcas sin exportar, la aplicación te avisa antes.
+<br clear="right">
+
+Si intentás cambiar de paciente, de imagen o cerrar el programa con marcas sin exportar, la aplicación te avisa antes:
+
+![Aviso de marcas sin exportar](docs/capturas/aviso.png)
+
+Las secciones del panel derecho arrancan plegadas y muestran un resumen (paciente, color y tamaño de la marca, formato). Se abren con un clic en el título.
 
 ### Colores de tatuaje
 
