@@ -1,0 +1,26 @@
+# Compilación (PyInstaller)
+build/
+dist/
+*.zip
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Datos de pacientes: NUNCA se suben al repositorio
+*.dcm
+*.DCM
+DICOM/
+Pacientes/
+DICOM_PRUEBA/
+
+# Imágenes exportadas
+Tatuaje.*
+
+# Archivos del sistema
+Thumbs.db
+desktop.ini
+.DS_Store
+~$*
