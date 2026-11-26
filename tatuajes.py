@@ -42,8 +42,8 @@ from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QFileDialog,
 # CONFIGURACIÓN
 # ==========================================================================
 APP_NOMBRE = "Tatoo CEMENER"
-APP_VERSION = "2.2"
-APP_ID = "cemener.tatoo.2.2"          # necesario para el icono en la barra de tareas
+APP_VERSION = "2.2.1"
+APP_ID = "cemener.tatoo.2.2.1"          # necesario para el icono en la barra de tareas
 
 ARCHIVO_LOGO = "logo_cemener.png"
 ARCHIVO_ICONO = "logo_cemener.ico"
@@ -58,7 +58,7 @@ MAX_CACHE = 12
 DIR_DICOM_DEFECTO = r"\\ARIADB\va_data$\filedata\DICOM"
 # Donde se guardan las imágenes exportadas: una carpeta por paciente,
 # "DNI - APELLIDO, NOMBRE", dentro de esta.
-DIR_SALIDA_DEFECTO = r"\\nas.cemener.org.ar\Fisica\Imagenes de pacientes"
+DIR_SALIDA_DEFECTO = r"\\nas.cemener.org.ar\Fisica\Radioterapia\Imagenes de pacientes"
 
 # Lista de pacientes ocultos. Se guarda en el perfil del usuario para que la
 # ocultación sobreviva al cierre del programa. Nunca se toca la carpeta original.
