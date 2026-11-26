@@ -14,6 +14,8 @@ Archivos que espera al lado del .py (o embebidos en el ejecutable):
 import ctypes
 import json
 import os
+import re
+import shutil
 import sys
 import tempfile
 from collections import OrderedDict
@@ -29,7 +31,7 @@ from PyQt6.QtGui import (QColor, QFont, QIcon, QImage, QKeySequence, QPainter,
                          QPalette,
                          QPainterPath, QPen, QPixmap, QPolygonF, QRegion,
                          QShortcut)
-from PyQt6.QtWidgets import (QApplication, QButtonGroup, QFileDialog, QFrame,
+from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QFileDialog, QFrame,
                              QGridLayout, QHBoxLayout, QLabel, QLineEdit,
                              QListWidget, QListWidgetItem, QMainWindow,
                              QMessageBox, QPushButton, QRadioButton,
@@ -40,8 +42,8 @@ from PyQt6.QtWidgets import (QApplication, QButtonGroup, QFileDialog, QFrame,
 # CONFIGURACIÓN
 # ==========================================================================
 APP_NOMBRE = "Tatoo CEMENER"
-APP_VERSION = "2.1"
-APP_ID = "cemener.tatoo.2.1"          # necesario para el icono en la barra de tareas
+APP_VERSION = "2.2"
+APP_ID = "cemener.tatoo.2.2"          # necesario para el icono en la barra de tareas
 
 ARCHIVO_LOGO = "logo_cemener.png"
 ARCHIVO_ICONO = "logo_cemener.ico"
@@ -54,6 +56,9 @@ SPLASH_MS = 0
 MAX_CACHE = 12
 
 DIR_DICOM_DEFECTO = r"\\ARIADB\va_data$\filedata\DICOM"
+# Donde se guardan las imágenes exportadas: una carpeta por paciente,
+# "DNI - APELLIDO, NOMBRE", dentro de esta.
+DIR_SALIDA_DEFECTO = r"\\nas.cemener.org.ar\Fisica\Imagenes de pacientes"
 
 # Lista de pacientes ocultos. Se guarda en el perfil del usuario para que la
 # ocultación sobreviva al cierre del programa. Nunca se toca la carpeta original.
@@ -784,6 +789,7 @@ QLabel#carpetaActual {{ color: {texto_ten}; font-size: 11px; }}
 
 QRadioButton {{ color: {texto}; font-size: 13px; spacing: 8px; padding: 2px 0; }}
 QRadioButton:disabled {{ color: #4A535F; }}
+QCheckBox {{ color: {texto}; font-size: 13px; spacing: 8px; padding: 2px 0; }}
 QRadioButton::indicator {{
     width: 12px; height: 12px; border-radius: 8px;
     border: 2px solid #4A5462; background: #12161B;
@@ -888,6 +894,9 @@ class TatooApp(QMainWindow):
         # marcas tal como estaban en la última exportación, para saber si
         # quedó algo sin guardar
         self._marcas_exportadas = []
+        # paciente de la imagen en pantalla (para la carpeta de salida)
+        self._paciente_actual = ""
+        self._carpeta_actual = ""
 
         self._construir_ui()
         self._atajos()
@@ -1133,7 +1142,9 @@ class TatooApp(QMainWindow):
         col.addWidget(self.sec_tatuajes)
 
         # --- Salida ---
-        self.sec_salida = Seccion("Formato de salida")
+        self.sec_salida = Seccion("Salida")
+        caja = self.sec_salida.caja
+        caja.addWidget(QLabel("Formato"))
         self.grupo_formato = QButtonGroup(self)
         grilla = QGridLayout()
         grilla.setVerticalSpacing(2)
@@ -1143,7 +1154,29 @@ class TatooApp(QMainWindow):
             self.grupo_formato.addButton(opcion, i)
             grilla.addWidget(opcion, i // 2, i % 2)
         self.grupo_formato.idToggled.connect(lambda *_: self._actualizar_destino())
-        self.sec_salida.caja.addLayout(grilla)
+        caja.addLayout(grilla)
+
+        caja.addWidget(QLabel("Carpeta de salida"))
+        fila = QHBoxLayout()
+        self.lbl_salida = QLabel()
+        self.lbl_salida.setObjectName("carpetaActual")
+        self.lbl_salida.setMinimumWidth(10)
+        self.btn_salida = QPushButton("Cambiar…")
+        self.btn_salida.setToolTip("Carpeta donde se crea la carpeta de cada paciente. "
+                                   "Queda guardada para la próxima vez.")
+        self.btn_salida.clicked.connect(self.elegir_carpeta_salida)
+        fila.addWidget(self.lbl_salida, stretch=1)
+        fila.addWidget(self.btn_salida)
+        caja.addLayout(fila)
+
+        self.chk_borrar = QCheckBox("Borrar carpeta del paciente al exportar")
+        self.chk_borrar.setToolTip(
+            "Después de exportar bien la imagen, borra la carpeta DICOM del "
+            "paciente (no se puede deshacer).")
+        self.chk_borrar.setChecked(
+            str(self.ajustes.value("borrar_tras_exportar", "false")).lower() in ("true", "1"))
+        self.chk_borrar.toggled.connect(self._cambiar_borrado)
+        caja.addWidget(self.chk_borrar)
         col.addWidget(self.sec_salida)
 
         # Si Estudio está abierta, la lista de pacientes se lleva el espacio
@@ -1252,11 +1285,45 @@ class TatooApp(QMainWindow):
         indice = self.grupo_formato.checkedId()
         return FORMATOS_EXPORT[indice if indice >= 0 else 0]
 
+    def _carpeta_salida(self) -> str:
+        return str(self.ajustes.value("carpeta_salida", "") or DIR_SALIDA_DEFECTO)
+
+    def _carpeta_paciente_salida(self):
+        """Nombre de la carpeta de salida del paciente actual: 'DNI - APELLIDO, NOMBRE'."""
+        # se usa el paciente de la imagen que está en pantalla, no el marcado
+        # en la lista (al cambiar de paciente la lista ya apunta al nuevo)
+        dni = self._carpeta_actual
+        if not dni:
+            return None
+        nombre = self._paciente_actual
+        texto = f"{dni} - {nombre}" if nombre else dni
+        # sin caracteres que Windows no acepta en nombres de carpeta
+        return re.sub(r'[\\/:*?"<>|]', "", texto).strip(" .")
+
     def _actualizar_destino(self):
         extension = self._formato_actual()[1]
-        self.lbl_destino.setText(
-            f"Se guarda como {NOMBRE_EXPORT}.{extension} en la carpeta que elijas.")
-        self.sec_salida.resumen(extension.upper())
+        base = self._carpeta_salida()
+        visible = base if len(base) <= 34 else "…" + base[-33:]
+        self.lbl_salida.setText(visible)
+        self.lbl_salida.setToolTip(base)
+        sub = self._carpeta_paciente_salida() or "DNI - APELLIDO, NOMBRE"
+        texto = f"Se guarda como {NOMBRE_EXPORT}.{extension} en «{sub}»."
+        if self.chk_borrar.isChecked():
+            texto += " Después se borra la carpeta DICOM del paciente."
+        self.lbl_destino.setText(texto)
+        self.sec_salida.resumen(extension.upper() +
+                                (" · borra carpeta" if self.chk_borrar.isChecked() else ""))
+
+    def _cambiar_borrado(self, marcado: bool):
+        self.ajustes.setValue("borrar_tras_exportar", marcado)
+        self._actualizar_destino()
+
+    def elegir_carpeta_salida(self):
+        carpeta = QFileDialog.getExistingDirectory(
+            self, "Elegir la carpeta de salida", self._carpeta_salida())
+        if carpeta:
+            self.ajustes.setValue("carpeta_salida", carpeta)
+            self._actualizar_destino()
 
     def _actualizar_resumenes(self):
         """Lo que se ve a la derecha del título cuando una sección está plegada."""
@@ -1485,6 +1552,8 @@ class TatooApp(QMainWindow):
 
         self.paciente_dir = os.path.join(self.directorio_raiz,
                                          item.data(Qt.ItemDataRole.UserRole))
+        self._paciente_actual = ""
+        self._carpeta_actual = ""
         self._cache_img.clear()
         try:
             with os.scandir(self.paciente_dir) as entradas:
@@ -1523,7 +1592,8 @@ class TatooApp(QMainWindow):
             self.lst_archivos.setCurrentItem(anterior)
             self.lst_archivos.blockSignals(False)
             return
-        self.cargar_dicom()
+        if self.paciente_dir and os.path.isdir(self.paciente_dir):
+            self.cargar_dicom()
 
     def cargar_dicom(self, *_):
         item = self.lst_archivos.currentItem()
@@ -1550,6 +1620,8 @@ class TatooApp(QMainWindow):
             self._guardar_en_cache(ruta, imagen, meta)
 
         self.lbl_paciente.setText(meta["paciente"])
+        self._paciente_actual = meta["paciente"]
+        self._carpeta_actual = os.path.basename(os.path.normpath(self.paciente_dir))
         self.espaciado_mm = meta["espaciado"]
 
         partes = [meta["modalidad"], f"{imagen.width()}×{imagen.height()} px"]
@@ -1601,10 +1673,30 @@ class TatooApp(QMainWindow):
         _, extension, formato, calidad = self._formato_actual()
         archivo = f"{NOMBRE_EXPORT}.{extension}"
 
-        carpeta = QFileDialog.getExistingDirectory(
-            self, f"Elegir la carpeta donde guardar {archivo}",
-            self.ultimo_dir_export or self.paciente_dir or self.directorio_raiz)
-        if not carpeta:
+        base = self._carpeta_salida()
+        if not os.path.isdir(base):
+            respuesta = QMessageBox.question(
+                self, "Carpeta de salida no disponible",
+                f"No se encuentra la carpeta de salida:\n{base}\n\n"
+                "¿Querés elegir otra carpeta solo para esta exportación?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if respuesta != QMessageBox.StandardButton.Yes:
+                return False
+            base = QFileDialog.getExistingDirectory(
+                self, "Elegir carpeta de salida", self.ultimo_dir_export or "")
+            if not base:
+                return False
+
+        carpeta_paciente = self._carpeta_paciente_salida()
+        if not carpeta_paciente:
+            return False
+        dni_carpeta = self._carpeta_actual
+        carpeta = os.path.join(base, carpeta_paciente)
+        try:
+            os.makedirs(carpeta, exist_ok=True)
+        except OSError as e:
+            QMessageBox.warning(self, "No se pudo crear la carpeta",
+                                f"{carpeta}\n\n{e}")
             return False
 
         ruta = os.path.join(carpeta, archivo)
@@ -1617,14 +1709,63 @@ class TatooApp(QMainWindow):
                 return False
 
         imagen = self.lienzo.render_export()
-        if imagen.save(ruta, formato, calidad):
-            self.ultimo_dir_export = carpeta
+        if imagen.save(ruta, formato, calidad) and os.path.getsize(ruta) > 0:
+            self.ultimo_dir_export = base
             self._marcas_exportadas = list(self.lienzo.marcas)
             self._estado(f"Guardado: {ruta}")
+            if self.chk_borrar.isChecked():
+                self._borrar_carpeta_paciente(dni_carpeta, ruta)
             return True
         QMessageBox.warning(self, "No se pudo guardar",
                             f"Revisá permisos de escritura en:\n{carpeta}")
         return False
+
+    def _borrar_carpeta_paciente(self, carpeta: str, exportado: str):
+        """Borra la carpeta DICOM del paciente (solo si está directamente
+        dentro de la carpeta DICOM elegida) y lo saca de la lista."""
+        raiz = os.path.normcase(os.path.normpath(self.directorio_raiz))
+        ruta = os.path.normpath(os.path.join(self.directorio_raiz, carpeta))
+        if (not carpeta or os.path.normcase(os.path.dirname(ruta)) != raiz
+                or not os.path.isdir(ruta)):
+            return
+        self._cache_img.clear()
+        self._precargando.clear()
+        try:
+            shutil.rmtree(ruta)
+        except OSError as e:
+            QMessageBox.warning(
+                self, "No se pudo borrar la carpeta del paciente",
+                f"La imagen se exportó bien en:\n{exportado}\n\n"
+                f"pero no se pudo borrar:\n{ruta}\n\n{e}")
+            return
+        self.nombres.pop(self._clave_oculto(carpeta), None)
+        self._quitar_paciente_de_lista(carpeta)
+        self._estado(f"Guardado: {exportado}  ·  carpeta {carpeta} borrada")
+
+    def _quitar_paciente_de_lista(self, carpeta: str):
+        actual = self.lst_pacientes.currentItem()
+        era_actual = actual is not None and actual.data(Qt.ItemDataRole.UserRole) == carpeta
+        self.lst_pacientes.blockSignals(True)
+        for i in range(self.lst_pacientes.count()):
+            if self.lst_pacientes.item(i).data(Qt.ItemDataRole.UserRole) == carpeta:
+                self.lst_pacientes.takeItem(i)
+                break
+        if era_actual:
+            self.lst_pacientes.setCurrentRow(-1)
+        self.lst_pacientes.blockSignals(False)
+        if era_actual:
+            self.lst_archivos.blockSignals(True)
+            self.lst_archivos.clear()
+            self.lst_archivos.blockSignals(False)
+            self._ajustar_alto_archivos()
+            self.paciente_dir = ""
+            self._paciente_actual = ""
+            self._carpeta_actual = ""
+            self._marcas_exportadas = []
+            self.lienzo.limpiar()
+            self.lbl_paciente.setText("Sin estudio cargado")
+            self.lbl_datos.setText("Ctrl+F para buscar un paciente")
+        self._refrescar_controles()
 
     # ---------------- lista de pacientes ----------------
     def _cargar_ocultos(self) -> set:

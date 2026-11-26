@@ -34,9 +34,15 @@ La primera vez, Windows puede mostrar el aviso "Windows protegió su PC" porque 
 2. **Imagen:** se abre sola la reconstrucción 3D (archivos que empiezan con `SC`). Si el paciente no tiene, se muestran todas sus imágenes.
 3. **Recortar** (opcional): `R` y arrastrá sobre la zona de interés. "Ver completa" vuelve a la imagen entera.
 4. **Colocar tatuajes:** elegí el color en la sección *Tatuajes*, apretá `T` y hacé clic en cada punto. `Ctrl+Z` deshace la última marca.
-5. **Exportar:** `Ctrl+E` o el botón *Exportar imagen…*, y elegí la carpeta. Se guarda como `Tatuaje.jpg` (el formato se cambia en *Formato de salida*).
+5. **Exportar:** `Ctrl+E` o el botón *Exportar imagen…*. La imagen se guarda como `Tatuaje.jpg` en la carpeta de imágenes de pacientes del servicio, dentro de una carpeta por paciente con el formato **`DNI - APELLIDO, NOMBRE`**. Si esa carpeta ya existe se usa; si no, se crea.
 
 <br clear="right">
+
+### Sección *Salida*
+
+- **Formato:** JPG (por defecto), PNG, BMP o TIFF.
+- **Carpeta de salida:** donde se crean las carpetas de cada paciente. Se puede cambiar con *Cambiar…* y queda guardada. Si al exportar no está disponible (por ejemplo, sin conexión al servidor), el programa avisa y permite elegir otra solo para esa vez.
+- **Borrar carpeta del paciente al exportar:** si está tildada, después de exportar bien la imagen se borra la carpeta DICOM del paciente y desaparece de la lista. **No se puede deshacer.** Si la exportación falla, no se borra nada. La opción queda recordada.
 
 Si intentás cambiar de paciente, de imagen o cerrar el programa con marcas sin exportar, la aplicación te avisa antes:
 
@@ -73,9 +79,9 @@ Al abrir, el programa usa la última carpeta que se eligió. Si no existe, prueb
 
 ### Qué guarda el programa en la PC
 
-Nada se guarda junto a los estudios: las carpetas DICOM solo se leen.
+Las carpetas DICOM solo se leen, salvo que esté activada la opción *Borrar carpeta del paciente al exportar*.
 
-- Carpeta elegida: registro de Windows del usuario (`HKCU\Software\CEMENER\TatooCEMENER`).
+- Carpeta DICOM, carpeta de salida y opción de borrado: registro de Windows del usuario (`HKCU\Software\CEMENER\TatooCEMENER`).
 - Pacientes ocultos con "Borrar paciente": `%USERPROFILE%\.tatoo_cemener_ocultos.json`. Ocultar un paciente **no borra** su carpeta.
 - Nombres de paciente ya leídos (para que la lista abra rápido): `%USERPROFILE%\.tatoo_cemener_nombres.json`.
 
